@@ -1,0 +1,5 @@
+symbol,side,qty,entry_price,exit_price,fees,exit_date,strategy,notes
+TCS,LONG,10,100,110,5,2026-11-20,Breakout,Good entry
+INFY,LONG,5,1500,1550,10,2026-11-21,Swing,Target achieved
+RELIANCE,SHORT,8,2500,2450,5,2026-11-22,Intraday,Quick trade
+WIPRO,LONG,10,500,480,5,2026-11-22,Reversal,Loss trade

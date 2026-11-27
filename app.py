@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 import analytics as an
 import storage as db
+import auth
 
 st.set_page_config(
     page_title="Trade Journal | Pro",
@@ -74,11 +75,19 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Authentication check
+if "user" not in st.session_state:
+    auth.show_auth_page()
+    st.stop()
+
+# Connect to database only after login
+user_id = st.session_state["user"].id
 con = db.connect()
 
 with st.sidebar:
     st.markdown("# 📈 TradePro")
     st.caption("Your personal trading analytics platform")
+    st.caption(f"Logged in as:{st.session_state['user'].email}")
     st.divider()
 
     page = st.radio(
@@ -94,6 +103,13 @@ with st.sidebar:
         value=100000.0,
         step=1000.0
     )
+
+    st.divider()
+
+    if st.button("Log Out", use_container_width=True):
+        auth.sign_out()
+        st.session_state.pop("user", None)
+        st.rerun()
 
 st.markdown(
     "<h1>Trade Journal & P&L Analyzer</h1>"
@@ -184,7 +200,7 @@ if page == "Add Trade":
         if submitted:
             try:
                 db.add_trade(
-                    con, symbol, side, qty,
+                    con, user_id,symbol, side, qty,
                     entry, exit_, date, fees,
                     strat, notes
                 )
@@ -202,7 +218,7 @@ if page == "Add Trade":
 elif page == "Journal":
     st.header("📒 Trade Journal")
 
-    rows = db.list_trades(con)
+    rows = db.list_trades(con, user_id)
 
     if rows:
         df = pd.DataFrame(rows)
@@ -255,7 +271,7 @@ elif page == "Journal":
             if st.form_submit_button("Update Trade"):
                 try:
                     db.update_trade(
-                        con, selected_id, symbol, side,
+                        con, selected_id, user_id, symbol, side,
                         qty, entry, exit_, date,
                         fees, strat, notes
                     )
@@ -270,7 +286,7 @@ elif page == "Journal":
         tid = st.selectbox("Select Trade to Delete", trade_ids)
 
         if st.button("Delete Selected Trade"):
-            if db.delete_trade(con, int(tid)):
+            if db.delete_trade(con, int(tid), user_id):
                 st.success("Trade deleted!")
                 st.rerun()
 
@@ -287,7 +303,7 @@ elif page == "Import CSV":
             with open("_upload.csv", "wb") as f:
                 f.write(up.getbuffer())
 
-            imported, errors = db.import_csv(con, "_upload.csv")
+            imported, errors = db.import_csv(con, "_upload.csv", user_id)
 
             st.success(
                 f"Successfully imported {imported} trades!"
@@ -306,7 +322,7 @@ elif page == "Import CSV":
 else:
     st.subheader("📊 Performance Overview")
 
-    rows = db.list_trades(con)
+    rows = db.list_trades(con, user_id)
 
     if not rows:
         st.info("No trades yet. Add a trade or import sample_trades.csv.")
@@ -379,10 +395,8 @@ else:
     with col4:
         st.markdown("#### 📅 Monthly P&L")
         st.caption("Tracks your trading profit or loss month by month.")
-
         df["month"] = df["exit_date"].str[:7]
         monthly_pnl = df.groupby("month")["pnl"].sum().sort_index()
-
         st.bar_chart(monthly_pnl, use_container_width=True)
 
     st.divider()

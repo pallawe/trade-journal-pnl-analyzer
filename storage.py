@@ -26,7 +26,7 @@ def connect():
     return con
 
 
-def add_trade(con, symbol, side, qty, entry, exit_, exit_date,
+def add_trade(con, user_id, symbol, side, qty, entry, exit_, exit_date,
               fees=0.0, strategy="", notes=""):
 
     if not str(symbol).strip():
@@ -40,9 +40,9 @@ def add_trade(con, symbol, side, qty, entry, exit_, exit_date,
         """INSERT INTO trades
         (symbol, side, qty, entry_price, exit_price, fees,
          exit_date, strategy, notes, pnl)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id""",
-        (symbol.strip().upper(), side.upper(), qty, entry,
+        (user_id,symbol.strip().upper(), side.upper(), qty, entry,
          exit_, fees, str(exit_date), strategy, notes, pnl)
     )
 
@@ -53,12 +53,12 @@ def add_trade(con, symbol, side, qty, entry, exit_, exit_date,
     return trade_id
 
 
-def list_trades(con):
+def list_trades(con, user_id):
 
     cur = con.cursor()
 
     cur.execute(
-        "SELECT * FROM trades ORDER BY exit_date, id"
+        "SELECT * FROM trades WHERE user_id = %s ORDER BY exit_date, id", (user_id,)
     )
 
     columns = [desc[0] for desc in cur.description]
@@ -69,13 +69,13 @@ def list_trades(con):
     cur.close()
     return result
 
-def delete_trade(con, trade_id):
+def delete_trade(con, trade_id, user_id):
 
     cur = con.cursor()
 
     cur.execute(
-        "DELETE FROM trades WHERE id = %s",
-        (trade_id,)
+        "DELETE FROM trades WHERE id = %s AND user_id = %s",
+        (trade_id, user_id)
     )
 
     deleted = cur.rowcount > 0
@@ -86,7 +86,7 @@ def delete_trade(con, trade_id):
     return deleted
 
 
-def update_trade(con, trade_id, symbol, side, qty, entry, exit_,
+def update_trade(con, trade_id, user_id, symbol, side, qty, entry, exit_,
                  exit_date, fees=0.0, strategy="", notes=""):
 
     if not str(symbol).strip():
@@ -104,7 +104,7 @@ def update_trade(con, trade_id, symbol, side, qty, entry, exit_,
            WHERE id=%s""",
         (symbol.strip().upper(), side.upper(), qty, entry,
          exit_, fees, str(exit_date), strategy, notes,
-         pnl, trade_id)
+         pnl, trade_id, user_id)
     )
 
     updated = cur.rowcount > 0
@@ -118,7 +118,7 @@ def update_trade(con, trade_id, symbol, side, qty, entry, exit_,
 
     
 
-def import_csv(con, path):
+def import_csv(con, path, user_id):
     """Import trades from a CSV file."""
 
     count = 0
@@ -157,6 +157,7 @@ def import_csv(con, path):
             try:
                 add_trade(
                     con,
+                    user_id,
                     r["symbol"],
                     r["side"],
                     float(r["qty"]),
